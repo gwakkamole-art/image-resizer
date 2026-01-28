@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>인트라넷 이미지 리사이저</title>
+    <style>
+        /* --- 1. Pretendard 폰트 --- */
+        @font-face { 
+            font-family: 'Pretendard'; 
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Regular.woff2') format('woff2'); 
+            font-weight: 400; font-display: swap; 
+        }
+        @font-face { 
+            font-family: 'Pretendard'; 
+            src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Bold.woff2') format('woff2'); 
+            font-weight: 700; font-display: swap; 
+        }
+
+        :root {
+            --primary: #2E4CB2;
+            --bg: #F0F5FF;
+            --white: #ffffff;
+            --red: #FF4D4D;
+            --green: #00BFA5;
+        }
+
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; line-height: 1.5; }
+        .container { max-width: 1000px; margin: 0 auto; padding-bottom: 80px; }
+        h2 { color: var(--primary); text-align: center; margin-bottom: 25px; letter-spacing: -0.5px; font-weight: 700; }
+        
+        /* --- 컨트롤 바 --- */
+        .control-bar {
+            background: var(--white); padding: 20px; border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06); position: sticky; top: 15px; z-index: 100;
+            border: 1px solid #dce8ff; display: flex; flex-direction: column; gap: 15px;
+        }
+        .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .row.bottom { justify-content: space-between; background: #f8f9fa; padding: 12px; border-radius: 12px; }
+
+        .file-label {
+            background: var(--primary); color: white; padding: 10px 20px; border-radius: 8px; cursor: pointer;
+            font-weight: bold; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s;
+        }
+        .file-label:hover { filter: brightness(1.1); transform: translateY(-2px); }
+        input[type="file"] { display: none; }
+
+        .url-input { padding: 10px; border: 1px solid #ccc; border-radius: 8px; flex: 1; min-width: 200px; font-family: 'Pretendard'; }
+        .btn-url { padding: 0 18px; height: 38px; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; font-weight: bold; color: #555; }
+        
+        .btn-clear { background: var(--red); color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-copy-all { 
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border: none; padding: 10px 24px; border-radius: 8px; 
+            cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.15); transition: 0.2s;
+        }
+        .btn-copy-all:hover { opacity: 0.9; transform: translateY(-2px); }
+
+        input[type="range"] { accent-color: var(--primary); cursor: pointer; width: 100%; height: 6px; }
+        
+        /* 숫자 입력칸 스타일 */
+        input[type="number"] {
+            width: 70px; padding: 5px; border: 1px solid #ccc; border-radius: 6px; font-family: 'Pretendard'; font-weight: bold; color: var(--primary); text-align: center;
+        }
+
+        /* --- 이미지 리스트 --- */
+        .image-list { margin-top: 25px; display: flex; flex-direction: column; gap: 20px; }
+        .image-card {
+            background: white; padding: 0; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            overflow: hidden; animation: fadeIn 0.3s; border: 2px solid transparent; transition: 0.3s;
+        }
+        .image-card.copied { border-color: var(--green); background: #f0fff4; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card-header { display: flex; justify-content: space-between; align-items: center; background: #fcfcfc; padding: 14px 24px; border-bottom: 1px solid #eee; }
+        .file-name { font-weight: bold; color: #555; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+        .yt-badge { background: #ff0000; color: white; font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
+        .btn-delete-item { color: #aaa; background: none; border: none; cursor: pointer; font-size: 0.9rem; font-weight: bold; }
+        .btn-delete-item:hover { color: var(--red); }
+
+        .card-body { display: flex; align-items: stretch; min-height: 200px; }
+        .preview-wrapper { flex: 1; background: #f9f9f9; padding: 20px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .card-controls { width: 280px; flex-shrink: 0; background: #fff; border-left: 1px solid #eee; padding: 25px; display: flex; flex-direction: column; justify-content: center; gap: 15px; }
+        
+        .preview-img { max-width: 100%; height: auto; transition: width 0.2s ease; box-shadow: 0 5px 20px rgba(0,0,0,0.1); border-radius: 4px; }
+        .size-label { font-size: 0.9rem; color: #666; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+        
+        .btn-copy-single {
+            width: 100%; padding: 12px; border: 2px solid var(--primary); color: var(--primary);
+            background: white; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.95rem; transition: 0.2s; font-family: 'Pretendard';
+        }
+        .btn-copy-single:hover { background: var(--primary); color: white; }
+
+        .help-box { background: #fff; padding: 30px; border-radius: 16px; margin-top: 40px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #e1e1e1; text-align: center; color: #555; }
+        .help-list { display: inline-block; text-align: left; font-size: 0.95rem; line-height: 1.8; color: #666; }
+        .highlight { color: var(--primary); font-weight: bold; background: #E8F0FE; padding: 2px 6px; border-radius: 4px; }
+        
+        /* 추가된 문의 문구 스타일 */
+        .footer-info { margin-top: 25px; font-size: 0.85rem; color: #aaa; border-top: 1px dashed #eee; padding-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🖼️ 인트라넷 이미지 리사이저</h2>
+
+    <div class="control-bar">
+        <div class="row" style="width: 100%;">
+            <label class="file-label">📂 파일 선택 (여러 장 가능)<input type="file" id="fileInput" multiple accept="image/*"></label>
+            <input type="text" id="urlInput" class="url-input" placeholder="이미지 URL 또는 유튜브 주소">
+            <button class="btn-url" onclick="addUrl()">추가</button>
+        </div>
+        
+        <div class="row bottom" style="width: 100%; box-sizing: border-box;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button class="btn-clear" onclick="clearAll()">🗑️ 전체 삭제</button>
+                <span style="border-left: 1px solid #ccc; height: 20px;"></span>
+                <span style="font-weight: bold; color: #555;">📏 전체 크기 조절:</span>
+                <input type="range" id="globalRange" min="100" max="1000" value="600" step="10" oninput="updateGlobal(this.value)" style="width: 120px;">
+                <input type="number" id="globalNumber" value="600" step="10" oninput="updateGlobal(this.value)" title="픽셀 값 직접 입력"> px
+            </div>
+            
+            <button class="btn-copy-all" onclick="copyAll()">📑 전체 일괄 복사</button>
+        </div>
+    </div>
+
+    <div class="image-list" id="imageList"></div>
+    
+    <div class="help-box">
+        <span style="font-size:1.1rem; font-weight:bold; display:block; margin-bottom:15px;">💡 사용 팁</span>
+        <div class="help-list">
+            1. <b>사진 넣기:</b> <span class="highlight">[📂 파일 선택]</span>을 누르고 여러 장을 드래그해서 넣으세요. (유튜브 URL 넣으면 자동으로 썸네일 나옵니다.)<br>
+            2. <b>크기 조절:</b> 슬라이더를 움직이거나, 옆에 있는 <b>숫자칸에 직접 입력</b>해도 됩니다.<br>
+            3. <b>복사하기:</b> <span class="highlight">[📑 전체 일괄 복사]</span> 버튼을 누르세요.<br>
+            4. <b>붙여넣기:</b> 게시판 글쓰기 창에서 <span class="highlight">Ctrl + V</span> 하세요. (무조건 왼쪽 정렬됩니다)
+        </div>
+        <div class="footer-info">
+            *모든 문의는 제작자인 곽민지에게 해주세요.
+        </div>
+    </div>
+</div>
+
+<script>
+    const imageList = document.getElementById('imageList');
+    const fileInput = document.getElementById('fileInput');
+    const urlInput = document.getElementById('urlInput');
+    const globalRange = document.getElementById('globalRange');
+    const globalNumber = document.getElementById('globalNumber');
+
+    fileInput.addEventListener('change', function(e) {
+        Array.from(e.target.files).forEach(processFile);
+        fileInput.value = ''; 
+    });
+
+    function addUrl() {
+        const url = urlInput.value.trim();
+        if(!url) return;
+        const youtubeId = getYoutubeId(url);
+        
+        if (youtubeId) {
+            addImageCard(`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`, "YouTube 썸네일", true);
+        } else {
+            addImageCard(url, "URL 이미지", false);
+        }
+        urlInput.value = '';
+    }
+
+    function getYoutubeId(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    function processFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) { addImageCard(e.target.result, file.name, false); };
+        reader.readAsDataURL(file);
+    }
+
+    function addImageCard(src, name, isYoutube) {
+        const id = Date.now() + Math.random().toString(36).substr(2, 9);
+        const defaultWidth = globalNumber.value; // 현재 설정된 전역 값으로 시작
+        const badge = isYoutube ? '<span class="yt-badge">YouTube</span>' : '';
+
+        const html = `
+            <div class="image-card" id="card-${id}" data-id="${id}">
+                <div class="card-header">
+                    <span class="file-name">${badge} ${name}</span>
+                    <button class="btn-delete-item" onclick="removeCard('${id}')">✖ 삭제</button>
+                </div>
+                <div class="card-body">
+                    <div class="preview-wrapper">
+                        <img src="${src}" id="img-${id}" class="preview-img target-img" style="width: ${defaultWidth}px;">
+                    </div>
+                    <div class="card-controls">
+                        <div>
+                            <div class="size-label">
+                                <span>너비(px)</span>
+                                <input type="number" id="num-${id}" value="${defaultWidth}" step="10" oninput="resizeImage('${id}', this.value)">
+                            </div>
+                            <input type="range" id="range-${id}" min="50" max="1200" value="${defaultWidth}" step="10" oninput="resizeImage('${id}', this.value)" class="width-slider">
+                        </div>
+                        <hr style="border: 0; border-top: 1px dashed #eee; width: 100%; margin: 10px 0;">
+                        <button class="btn-copy-single" onclick="copySingle('${id}', '${src.replace(/'/g, "\\'")}')">📋 이 사진만 복사</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        imageList.insertAdjacentHTML('beforeend', html);
+    }
+
+    // 개별 조절 로직 (슬라이더 <-> 숫자 연동)
+    function resizeImage(id, width) {
+        document.getElementById(`img-${id}`).style.width = width + "px";
+        document.getElementById(`range-${id}`).value = width;
+        document.getElementById(`num-${id}`).value = width;
+    }
+
+    // 전체 조절 로직 (상단 컨트롤 -> 하단 모두 반영)
+    function updateGlobal(width) {
+        // 상단 슬라이더와 숫자판 동기화
+        globalRange.value = width;
+        globalNumber.value = width;
+
+        // 하단 모든 카드 동기화
+        const cards = document.querySelectorAll('.image-card');
+        cards.forEach(card => {
+            const id = card.dataset.id;
+            resizeImage(id, width);
+        });
+    }
+
+    function clearAll() {
+        if(imageList.children.length === 0) return;
+        if(confirm('정말 모든 사진을 지우시겠습니까?')) imageList.innerHTML = '';
+    }
+
+    function removeCard(id) { document.getElementById(`card-${id}`).remove(); }
+
+    // ★ 개별 복사 (왼쪽 정렬 고정) ★
+    async function copySingle(id, src) {
+        const width = document.getElementById(`img-${id}`).style.width;
+        
+        // p style="text-align: left;" 추가
+        const htmlContent = `<p style="text-align: left;"><img src="${src}" width="${parseInt(width)}" style="width: ${width}; height: auto;"></p>`;
+
+        try {
+            const blob = new Blob([htmlContent], { type: "text/html" });
+            const item = new ClipboardItem({ "text/html": blob });
+            await navigator.clipboard.write([item]);
+            showFeedback(`#card-${id} .btn-copy-single`, "✅ 복사 완료!");
+        } catch (err) { alert("복사 실패."); }
+    }
+
+    // ★ 전체 일괄 복사 (왼쪽 정렬 고정) ★
+    async function copyAll() {
+        const cards = document.querySelectorAll('.image-card');
+        if(cards.length === 0) { alert("복사할 사진이 없습니다."); return; }
+
+        let combinedHtml = '';
+
+        cards.forEach(card => {
+            const imgTag = card.querySelector('.target-img');
+            const src = imgTag.src;
+            const width = imgTag.style.width;
+            
+            // p style="text-align: left;" 추가
+            combinedHtml += `<p style="text-align: left;"><img src="${src}" width="${parseInt(width)}" style="width: ${width}; height: auto;"></p><br>`;
+        });
+
+        try {
+            const blob = new Blob([combinedHtml], { type: "text/html" });
+            const item = new ClipboardItem({ "text/html": blob });
+            await navigator.clipboard.write([item]);
+            showFeedback('.btn-copy-all', "✅ 전체 복사 완료!");
+        } catch (err) { alert("복사 실패."); }
+    }
+
+    function showFeedback(selector, msg) {
+        const btn = document.querySelector(selector);
+        const originalText = btn.innerText;
+        btn.innerText = msg;
+        btn.style.background = (selector.includes('single')) ? "#2E4CB2" : "#00BFA5";
+        btn.style.color = "white";
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.background = ""; btn.style.color = "";
+        }, 1500);
+    }
+</script>
+
+</body>
+</html>
